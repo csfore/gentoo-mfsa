@@ -18,4 +18,3 @@ And it should output a template to copy/paste into the products' respective bugs
 ## Todo
 
 - [ ] Add arguments for various options (argparse?)
-- [ ] 
