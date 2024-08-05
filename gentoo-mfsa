@@ -1,0 +1,80 @@
+#!/usr/bin/env python
+# SPDX-License-Identifier: GPL-3.0
+# Ignore the pretty print stuff, it's there just for debugging purposes
+# This is very much in an alpha state! I made this in the span of like half an hour
+
+import yaml
+import sys
+import pprint
+
+
+pp = pprint.PrettyPrinter(indent=4)
+
+def merge_cves(report):
+    report['All products'] = {}
+    
+    seen_cves = []
+    dup_cves = []
+
+    for product in report:
+        for cve in report[product]:
+            if cve in seen_cves:
+                report['All products'][cve] = report[product][cve]
+                dup_cves.append(cve)
+                continue
+            seen_cves.append(cve)
+ 
+    for product in report.copy():
+        if product == 'All products':
+            continue
+        for cve in report[product].copy():
+            if cve in dup_cves:
+                del report[product][cve]
+    
+    return report
+
+
+def generate_bug_report(report):
+
+    for product in report:
+        if len(report[product]) != 0:
+            print("============================")
+            print(product)
+            print("============================")
+        for cve in report[product]:
+            print(f"{cve}:\n\n{report[product][cve]}\n\n\n")
+    print("MFSA report generated!")
+    print("Copy the CVE and descriptions below the product and report them in their appropiate bugs.")
+    print("Please put the all product CVEs in the tracker.")
+
+
+def main():
+    mfsa_report = {}
+    
+    numbers = sys.argv[1:]
+
+    if numbers == []:
+        print("Please provide at least one MFSA number.")
+        sys.exit(1)
+
+    for arg in numbers:
+        with open(f'announce/2024/mfsa2024-{arg}.yml', 'r') as mfsa_file:
+            mfsa = yaml.safe_load(mfsa_file)
+            fixed_in = mfsa['fixed_in'][0]
+            mfsa_report[fixed_in] = {}
+        
+            advisories = mfsa['advisories']
+
+            for cve in advisories:
+                cve_description = advisories[cve]['description']
+                mfsa_report[fixed_in][cve] = cve_description
+                #pp.pprint(f"{cve},{advisories['description']}")
+
+    
+    clean_mfsa_report = merge_cves(mfsa_report)
+    #pp.pprint(clean_mfsa_report)
+    generate_bug_report(clean_mfsa_report)
+
+
+if __name__ == "__main__":
+    main()
