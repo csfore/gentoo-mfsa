@@ -6,80 +6,92 @@ import argparse
 from datetime import date
 import os
 import pprint
+import re
 import sys
 import yaml
-import re
-
-
-pp = pprint.PrettyPrinter(indent=4)
-
 
 def strip_html(text):
+    '''Strips html tags out of MFSA reports'''
     clean = re.compile('<.*?>')
     return re.sub(clean, '', text)
 
 
-
 def merge_cves(report):
+    '''Merges the list of duplicate CVEs and deletes them from their old list'''
     report['All products'] = {}
-    
+    report['All products']['cves'] = {}
+
     seen_cves = []
     dup_cves = []
 
     for product in report:
-        for cve in report[product]:
+        for cve in report[product]["cves"]:
             if cve in seen_cves:
-                report['All products'][cve] = report[product][cve]
+                report['All products']["cves"][cve] = report[product]["cves"][cve]
                 dup_cves.append(cve)
                 continue
             seen_cves.append(cve)
- 
+
     for product in report.copy():
         if product == 'All products':
             continue
-        for cve in report[product].copy():
+        for cve in report[product]["cves"].copy():
             if cve in dup_cves:
-                del report[product][cve]
-    
+                del report[product]["cves"][cve]
+
     return report
 
 
 def generate_bug_report(report):
+    '''Prints out a bug report'''
+
+    cves = []
     for product in report:
-        if len(report[product]) != 0:
+        if len(report[product]["cves"]) != 0:
             print("============================")
             print(product)
             print("============================")
-        for cve in report[product]:
-            print(f"{cve}:\n\n{report[product][cve]}\n\n\n")
-    print("MFSA report generated!")
-    print("Copy the CVE and descriptions below the product and report them in their appropiate bugs.")
-    print("Please put the all product CVEs in the tracker.")
+        for cve in report[product]["cves"]:
+            cves.append(cve)
+            print(f"{cve}:\n\n{report[product]['cves'][cve]}\n")
+
+
+    for product in report:
+        if product == 'All products':
+            continue
+        print(f"{product}: {report[product]['url']}")
+    print("")
+    return cves
 
 
 def setup_parser():
+    '''Setting up our parser using argparse'''
     parser = argparse.ArgumentParser(
             prog="gentoo-mfsa",
-            description="Easy script for creating MFSA bugs")
+            description="Easy script for creating MFSA bugs",
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     parser.add_argument('mfsas', nargs='*')
     parser.add_argument('-y', '--year', type=int, default=date.today().year)
-    parser.add_argument('-d', '--dir', type=str, default="./announce")
+    parser.add_argument('-d', '--dir', type=str, default='./announce')
+    parser.add_argument('-D', '--debug', action='store_true')
 
     return parser
 
 
 def main():
+    '''Main entrypoint'''
     parser = setup_parser()
     args = parser.parse_args()
 
-    print(args.dir)
+    if args.debug:
+        pp = pprint.PrettyPrinter(indent=4)
 
     if not os.path.exists(args.dir):
         raise FileNotFoundError("Invalid MFSA path given")
 
     mfsa_report = {}
-    
+
     numbers = args.mfsas
 
     if numbers == []:
@@ -87,22 +99,43 @@ def main():
         sys.exit(1)
 
     for arg in numbers:
-        with open(f'{args.dir}/{args.year}/mfsa{args.year}-{arg}.yml', 'r') as mfsa_file:
+        with open(f'{args.dir}/{args.year}/mfsa{args.year}-{arg}.yml', 'r', encoding='utf-8') as mfsa_file:
             mfsa = yaml.safe_load(mfsa_file)
             fixed_in = mfsa['fixed_in'][0]
             mfsa_report[fixed_in] = {}
-        
+            mfsa_report[fixed_in]["cves"] = {}
+            mfsa_report[fixed_in]['url'] = f"https://www.mozilla.org/en-US/security/advisories/mfsa{args.year}-{arg}/"
+
             advisories = mfsa['advisories']
 
             for cve in advisories:
                 cve_description = strip_html(advisories[cve]['description'])
-                mfsa_report[fixed_in][cve] = cve_description
-                #pp.pprint(f"{cve},{advisories['description']}")
 
-    
+                mfsa_report[fixed_in]["cves"][cve] = cve_description
+                if args.debug:
+                    pp.pprint(f"{cve},{advisories[cve]['description']}")
+
+
     clean_mfsa_report = merge_cves(mfsa_report)
-    #pp.pprint(clean_mfsa_report)
-    generate_bug_report(clean_mfsa_report)
+    if args.debug:
+        pp.pprint(clean_mfsa_report)
+
+    cves = generate_bug_report(clean_mfsa_report)
+    mfsas = []
+
+    for number in numbers:
+        mfsas.append(f'MFSA{args.year}-{number}')
+
+    print("======================")
+    print("Bug details")
+    print("======================")
+    print("Aliases:")
+    print(','.join(cves) + ',' + ','.join(mfsas) + '\n')
+    print("URL:")
+    print(f"https://www.mozilla.org/en-US/security/advisories/mfsa{args.year}-{numbers[0]}/\n")
+    print("MFSA report generated!")
+    print("Copy the CVE and descriptions below the product and report them in their appropiate bugs.")
+    print("Please put the all product CVEs in the tracker.")
 
 
 if __name__ == "__main__":
