@@ -2,6 +2,11 @@
 # SPDX-License-Identifier: GPL-3.0
 # Ignore the pretty print stuff, it's there just for debugging purposes
 
+"""
+gentoo-mfsa is a simple program to generate bug information for Mozilla's MFSAs to make it
+easier to report to Gentoo
+"""
+
 import argparse
 from datetime import date
 import os
@@ -45,16 +50,34 @@ def merge_cves(report):
 def generate_bug_report(report):
     '''Prints out a bug report'''
 
-    cves = []
+    cves = {}
     for product in report:
-        if len(report[product]["cves"]) != 0:
-            print("============================")
-            print(product)
-            print("============================")
         for cve in report[product]["cves"]:
-            cves.append(cve)
-            print(f"{cve}:\n\n{report[product]['cves'][cve]}\n")
+            if "Android" in report[product]['cves'][cve]:
+                continue
+            if "Windows" in report[product]['cves'][cve]:
+                continue
+            cves[cve] = report[product]['cves'][cve]
 
+        print("============================")
+        print(product)
+        print("============================")
+        if len(report[product]["cves"]) == 0:
+            print("**No CVEs for solely this Mozilla product**\n")
+            continue
+
+        print("Aliases:")
+        print(",".join(cves) + "\n")
+        #if product != 'All products':
+        #    print(f"https://www.mozilla.org/en-US/security/advisories/" \
+        #        "mfsa{args.year}-{numbers[0]}/\n")
+
+        for cve, desc in cves.items():
+            print(f"{cve}:\n\n{desc}\n")
+
+        if product != 'All products':
+            print("\nPlease refer to the tracker for the full list of CVEs that affect all " \
+                    "Mozilla products.\n")
 
     for product in report:
         if product == 'All products':
@@ -99,12 +122,15 @@ def main():
         sys.exit(1)
 
     for arg in numbers:
-        with open(f'{args.dir}/{args.year}/mfsa{args.year}-{arg}.yml', 'r', encoding='utf-8') as mfsa_file:
+        with open(f'{args.dir}/{args.year}/mfsa{args.year}-{arg}.yml',
+                  'r', 
+                  encoding='utf-8') as mfsa_file:
             mfsa = yaml.safe_load(mfsa_file)
             fixed_in = mfsa['fixed_in'][0]
             mfsa_report[fixed_in] = {}
             mfsa_report[fixed_in]["cves"] = {}
-            mfsa_report[fixed_in]['url'] = f"https://www.mozilla.org/en-US/security/advisories/mfsa{args.year}-{arg}/"
+            mfsa_report[fixed_in]['url'] = "https://www.mozilla.org/en-US/security/advisories"\
+                    f"/mfsa{args.year}-{arg}/"
 
             advisories = mfsa['advisories']
 
@@ -120,7 +146,7 @@ def main():
     if args.debug:
         pp.pprint(clean_mfsa_report)
 
-    cves = generate_bug_report(clean_mfsa_report)
+    generate_bug_report(clean_mfsa_report)
     mfsas = []
 
     for number in numbers:
@@ -129,12 +155,11 @@ def main():
     print("======================")
     print("Bug details")
     print("======================")
-    print("Aliases:")
-    print(','.join(cves) + ',' + ','.join(mfsas) + '\n')
     print("URL:")
     print(f"https://www.mozilla.org/en-US/security/advisories/mfsa{args.year}-{numbers[0]}/\n")
     print("MFSA report generated!")
-    print("Copy the CVE and descriptions below the product and report them in their appropiate bugs.")
+    print("Copy the CVE and descriptions below the product and report them in"\
+          "their appropiate bugs.")
     print("Please put the all product CVEs in the tracker.")
 
 
