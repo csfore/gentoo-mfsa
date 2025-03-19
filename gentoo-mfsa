@@ -6,6 +6,11 @@ gentoo-mfsa is a simple program to generate bug information for Mozilla's MFSAs 
 easier to report to Gentoo
 """
 
+__version__ = "0.0.1"
+__author__ = "Christopher Fore"
+__email__ = "csfore@posteo.net"
+__license__ = "GPL-3.0"
+
 import argparse
 from datetime import date
 from pathlib import Path
@@ -112,7 +117,7 @@ def main():
 
     if args.debug:
         pp = pprint.PrettyPrinter(indent=4)
-        
+
     mfsa_path = Path(args.dir) / str(args.year)
 
     if not mfsa_path.exists():
@@ -156,12 +161,14 @@ def main():
 
     clean_mfsa_report = merge_cves(mfsa_report)
     if args.debug:
-        pp.pprint(f"\n[DEBUG] Processed MFSA data for: {arg}")
+        pp.pprint("\n[DEBUG] Processed MFSA data for")
         pp.pprint(clean_mfsa_report)
 
     generate_bug_report(clean_mfsa_report)
     mfsas = [f'MFSA{args.year}-{number}' for number in numbers]
 
+    print("MFSA Aliases:")
+    print(",".join(mfsas))
     print("======================")
     print("Bug details")
     print("======================")
