@@ -61,17 +61,18 @@ def generate_bug_report(report):
     for product in report:
         cves = {}
         for cve in report[product]["cves"]:
+
             if "Android" in report[product]['cves'][cve]:
                 continue
-            if "Windows" in report[product]['cves'][cve]:
-                continue
+            #if "Windows" in report[product]['cves'][cve]:
+            #    continue
             cves[cve] = report[product]['cves'][cve]
 
         print("============================")
         print(product)
         print("============================")
         if len(report[product]["cves"]) == 0:
-            print("**No CVEs for solely this Mozilla product**\n")
+            print("**No CVEs for solely this Mozilla product**\n\n\nPlease refer to the tracker for the full list of CVEs that affect all Mozilla products.\n")
             continue
 
         print("Aliases:")
@@ -152,11 +153,15 @@ def main():
             advisories = mfsa['advisories']
 
             for cve in advisories:
-                cve_description = strip_html(advisories[cve]['description'])
+                cve_description = "No description provided"
+                if "description" in advisories[cve]:
+                    cve_description = strip_html(advisories[cve]['description'])
 
                 mfsa_report[fixed_in]["cves"][cve] = cve_description
                 if args.debug:
                     pp.pprint(f"{cve},{advisories[cve]['description']}")
+                continue
+
 
 
     clean_mfsa_report = merge_cves(mfsa_report)
