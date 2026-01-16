@@ -63,7 +63,7 @@ def generate_bug_report(report):
     for product in report:
         cves = {}
         for cve in report[product]["cves"]:
-            
+
             # Try to ignore the reports that reference Android
             if "Android" in report[product]['cves'][cve]:
                 continue
@@ -75,7 +75,8 @@ def generate_bug_report(report):
         print(product)
         print("============================")
         if len(report[product]["cves"]) == 0:
-            print("**No CVEs for solely this Mozilla product**\n\n\nPlease refer to the tracker for the full list of CVEs that affect all Mozilla products.\n")
+            print("**No CVEs for solely this Mozilla product**\n\n\nPlease refer to the tracker "\
+                    "for the full list of CVEs that affect all Mozilla products.\n")
             continue
 
         print("Aliases:")
@@ -99,13 +100,18 @@ def generate_bug_report(report):
     return cves
 
 def setup(debug):
+    '''Setup the MFSA environment'''
     if debug:
         print("[DEBUG] Cloning repository")
-    subprocess.run(["git", "clone", "https://github.com/mozilla/foundation-security-advisories.git"])
+    subprocess.run(
+            ["git", "clone", "https://github.com/mozilla/foundation-security-advisories.git"],
+            check=True
+            )
 
     if debug:
         print("[DEBUG] Symlinking")
-    subprocess.run(["ln", "-s", "./foundation-security-advisories/announce/", "./announce"])
+    subprocess.run(["ln", "-s", "./foundation-security-advisories/announce/", "./announce"],
+                   check=True)
 
 
 def setup_parser():
@@ -114,7 +120,7 @@ def setup_parser():
             prog="gentoo-mfsa",
             description="Easy script for creating MFSA bugs",
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    
+
     parser.add_argument('-s', '--setup', action='store_true')
     parser.add_argument('mfsas', nargs='*')
     parser.add_argument('-y', '--year', type=int, default=date.today().year)
@@ -136,12 +142,14 @@ def main():
     if args.setup:
         print("Setting up the environment")
         setup(args.debug)
-        exit(0)
+        sys.exit(0)
 
     mfsa_path = Path(args.dir) / str(args.year)
 
     if not mfsa_path.exists():
-        raise FileNotFoundError("Invalid MFSA path given: {mfsa_path}. Try running `./gentoo-mfsa --setup`")
+        raise FileNotFoundError(
+                "Invalid MFSA path given: {mfsa_path}. Try running `./gentoo-mfsa --setup`"
+                )
 
     mfsa_report = {}
 
