@@ -6,7 +6,7 @@ gentoo-mfsa is a simple program to generate bug information for Mozilla's MFSAs 
 easier to report to Gentoo
 """
 
-__version__ = "0.0.1"
+__version__ = "0.0.2"
 __author__ = "Christopher Fore"
 __email__ = "csfore@posteo.net"
 __license__ = "GPL-3.0"
@@ -16,6 +16,7 @@ from datetime import date
 from pathlib import Path
 import pprint
 import re
+import subprocess
 import sys
 import yaml
 
@@ -37,6 +38,7 @@ def merge_cves(report):
     report['All products']['cves'] = {}
 
     seen_cves = set()
+    pprint.pp(report)
 
     for product in report:
         for cve, desc in report[product].get("cves", {}).items():
@@ -61,7 +63,8 @@ def generate_bug_report(report):
     for product in report:
         cves = {}
         for cve in report[product]["cves"]:
-
+            
+            # Try to ignore the reports that reference Android
             if "Android" in report[product]['cves'][cve]:
                 continue
             #if "Windows" in report[product]['cves'][cve]:
@@ -95,6 +98,15 @@ def generate_bug_report(report):
     print("")
     return cves
 
+def setup(debug):
+    if debug:
+        print("[DEBUG] Cloning repository")
+    subprocess.run(["git", "clone", "https://github.com/mozilla/foundation-security-advisories.git"])
+
+    if debug:
+        print("[DEBUG] Symlinking")
+    subprocess.run(["ln", "-s", "./foundation-security-advisories/announce/", "./announce"])
+
 
 def setup_parser():
     '''Setting up our parser using argparse'''
@@ -102,11 +114,13 @@ def setup_parser():
             prog="gentoo-mfsa",
             description="Easy script for creating MFSA bugs",
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-
+    
+    parser.add_argument('-s', '--setup', action='store_true')
     parser.add_argument('mfsas', nargs='*')
     parser.add_argument('-y', '--year', type=int, default=date.today().year)
     parser.add_argument('-d', '--dir', type=str, default='./announce')
     parser.add_argument('-D', '--debug', action='store_true')
+    parser.add_argument('-v', '--version', action='version', version=f'%(prog)s {__version__}')
 
     return parser
 
@@ -119,10 +133,15 @@ def main():
     if args.debug:
         pp = pprint.PrettyPrinter(indent=4)
 
+    if args.setup:
+        print("Setting up the environment")
+        setup(args.debug)
+        exit(0)
+
     mfsa_path = Path(args.dir) / str(args.year)
 
     if not mfsa_path.exists():
-        raise FileNotFoundError("Invalid MFSA path given: {mfsa_path}")
+        raise FileNotFoundError("Invalid MFSA path given: {mfsa_path}. Try running `./gentoo-mfsa --setup`")
 
     mfsa_report = {}
 
@@ -133,6 +152,9 @@ def main():
         sys.exit(1)
 
     for arg in numbers:
+        if len(arg) == 1:
+            arg = arg.zfill(2)
+
         with open(f'{args.dir}/{args.year}/mfsa{args.year}-{arg}.yml',
                   'r', 
                   encoding='utf-8',
